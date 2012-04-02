@@ -5,6 +5,7 @@
   * @license    GPL 2 (http://www.gnu.org/licenses/gpl.html)
   * @author     Luigi Micco <l.micco@tiscali.it>
   * @author     Andreas Gohr <andi@splitbrain.org>
+  * @author     Sam Wilson <sam@samwilson.id.au>
   */
 
 // must be run within Dokuwiki
@@ -98,15 +99,17 @@ class action_plugin_dw2pdf extends DokuWiki_Action_Plugin {
             $template = $this->load_template($title);
 
             // prepare HTML header styles
-            $html  = '<html><head>';
-            $html .= '<style>';
-            $html .= $this->load_css();
-            $html .= '@page { size:auto; '.$template['page'].'}';
-            $html .= '@page :first {'.$template['first'].'}';
-            $html .= '</style>';
-            $html .= '</head><body>';
-            $html .= $template['html'];
-            $html .= '<div class="dokuwiki">';
+            $html  = '<html><head><style>'
+                   . $this->load_css()
+                   . '@page { size:auto; '.$template['page'].'}'
+                   . '@page :first {'.$template['first'].'}'
+                   . '@page landscape-page { size:landscape }'
+                   . 'div.dw2pdf-landscape { page:landscape-page }'
+                   . '@page portrait-page { size:portrait }'
+                   . 'div.dw2pdf-portrait { page:portrait-page }'
+                   . '</style></head><body>'
+                   . $template['html']
+                   . '<div class="dokuwiki">';
 
             // loop over all pages
             $cnt = count($list);
