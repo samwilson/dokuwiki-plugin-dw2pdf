@@ -5,6 +5,7 @@
   * @license    GPL 2 (http://www.gnu.org/licenses/gpl.html)
   * @author     Luigi Micco <l.micco@tiscali.it>
   * @author     Andreas Gohr <andi@splitbrain.org>
+  * @author     Sam Wilson <sam@samwilson.id.au>
   */
 
 // must be run within Dokuwiki
@@ -103,6 +104,10 @@ class action_plugin_dw2pdf extends DokuWiki_Action_Plugin {
             $html .= $this->load_css();
             $html .= '@page { size:auto; '.$template['page'].'}';
             $html .= '@page :first {'.$template['first'].'}';
+            $html .= '@page landscape-page { size:landscape }';
+            $html .= 'div.dw2pdf-landscape { page:landscape-page }';
+            $html .= '@page portrait-page { size:portrait }';
+            $html .= 'div.dw2pdf-portrait { page:portrait-page }';
             $html .= $template['css'];
             $html .= '</style>';
             $html .= '</head><body>';
