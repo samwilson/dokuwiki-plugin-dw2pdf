@@ -218,6 +218,7 @@ class action_plugin_dw2pdf extends DokuWiki_Action_Plugin {
                 '@TPLBASE@' => DOKU_BASE.'lib/plugins/dw2pdf/tpl/'.$tpl.'/',
                 '@TPLBASE@' => DOKU_PLUGIN.'dw2pdf/tpl/'.$tpl.'/',
                 '@QRCODE@'  => $qr_code,
+                '@REVNUM@'  => $this->get_revision_count(),
         );
 
         // set HTML element
@@ -235,6 +236,56 @@ class action_plugin_dw2pdf extends DokuWiki_Action_Plugin {
         }
 
         return $output;
+    }
+
+    /**
+     * Get the number of revisions for the current page (including when the
+     * current view is an old revision).  Has the option to limit to revisions
+     * of any of the following change types:
+     *     DOKU_CHANGE_TYPE_CREATE,
+     *     DOKU_CHANGE_TYPE_EDIT,
+     *     DOKU_CHANGE_TYPE_MINOR_EDIT,
+     *     DOKU_CHANGE_TYPE_DELETE, and
+     *     DOKU_CHANGE_TYPE_REVERT.
+     * All except minor revisions are included if the $types parameter is not
+     * used.
+     * 
+     * Note: This is public and static because it can be useful in templates,
+     * and should probably not live in this class at all.
+     * 
+     * @uses getRevisions()
+     * @uses getRevisionInfo()
+     * @param array $types Revision types to be included in the count.
+     * @return int The total number of revisions.
+     */
+    public static function get_revision_count($types = null) {
+        global $ID, $INFO, $REV;
+        if (empty($types)) {
+            // These types are defined in inc/changelog.php
+            $types = array(
+                DOKU_CHANGE_TYPE_CREATE,
+                DOKU_CHANGE_TYPE_EDIT,
+                //DOKU_CHANGE_TYPE_MINOR_EDIT,
+                DOKU_CHANGE_TYPE_DELETE,
+                DOKU_CHANGE_TYPE_REVERT,
+            );
+        }
+        $count = 0;
+        // Get all revisions, including current
+        $revisions = array_merge(
+            array($INFO['meta']['last_change']['date']),
+            getRevisions($ID, 0, PHP_INT_MAX)
+        );
+        // Get revision timestamp of the currently-viewed page revision
+        $before = (is_int($REV)) ? $REV : $INFO['meta']['last_change']['date'];
+        foreach ($revisions as $revision) {
+            $info = getRevisionInfo($ID, $revision);
+            // Of requred type and earlier than $before
+            if (in_array($info['type'], $types) && $info['date']<=$before) {
+                $count++;
+            }
+        }
+        return $count;
     }
 
     /**
