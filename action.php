@@ -15,6 +15,9 @@ class action_plugin_dw2pdf extends DokuWiki_Action_Plugin {
 
     private $tpl;
 
+    /** @var DokuPDF The mPDF object. */
+    private $mpdf;
+
     /**
      * Constructor. Sets the correct template
      */
@@ -75,24 +78,24 @@ class action_plugin_dw2pdf extends DokuWiki_Action_Plugin {
         if(!$this->getConf('usecache') || !$cache->useCache($depends)){
             // initialize PDF library
             require_once(dirname(__FILE__)."/DokuPDF.class.php");
-            $mpdf = new DokuPDF();
+            $this->mpdf = new DokuPDF();
 
             // let mpdf fix local links
             $self = parse_url(DOKU_URL);
             $url  = $self['scheme'].'://'.$self['host'];
             if($self['port']) $url .= ':'.$port;
-            $mpdf->setBasePath($url);
+            $this->mpdf->setBasePath($url);
 
             // Set the title
             $title = $_GET['pdfbook_title'];
             if(!$title) $title = p_get_first_heading($ID);
-            $mpdf->SetTitle($title);
+            $this->mpdf->SetTitle($title);
 
             // some default settings
-            $mpdf->mirrorMargins = 1;
-            $mpdf->useOddEven    = 1;
-            $mpdf->setAutoTopMargin = 'stretch';
-            $mpdf->setAutoBottomMargin = 'stretch';
+            $this->mpdf->mirrorMargins = 1;
+            $this->mpdf->useOddEven    = 1;
+            $this->mpdf->setAutoTopMargin = 'stretch';
+            $this->mpdf->setAutoBottomMargin = 'stretch';
 
             // load the template
             $template = $this->load_template($title);
@@ -120,11 +123,11 @@ class action_plugin_dw2pdf extends DokuWiki_Action_Plugin {
                 }
             }
 
-            $html .= '</div>';
-            $mpdf->WriteHTML($html);
+            $html .= '</div></body></html>';
+            $this->mpdf->WriteHTML($html);
 
             // write to cache file
-            $mpdf->Output($cache->cache, 'F');
+            $this->mpdf->Output($cache->cache, 'F');
         }
 
         // deliver the file
@@ -227,7 +230,39 @@ class action_plugin_dw2pdf extends DokuWiki_Action_Plugin {
             $output['cite'] = str_replace(array_keys($replace), array_values($replace), $output['cite']);
         }
 
+        // Set up custom fonts if config_fonts.php is present in the template
+        $this->setupTemplateFonts();
+
         return $output;
+    }
+
+    /**
+     * Check for the config_fonts.php file in the template directory, and set up
+     * mPDF to use any fonts found in that file.  The path to the system font
+     * directory also needs to be set in conf/local.protected.php by defining
+     * the _MPDF_SYSTEM_TTFONTS constant.
+     * 
+     * @return void
+     */
+    private function setupTemplateFonts() {
+        // Get the config file
+        $config_file = DOKU_PLUGIN.'dw2pdf/tpl/'.$this->tpl.'/config_fonts.php';
+        if (!file_exists($config_file)) return;
+        include_once($config_file);
+
+        // Load custom fonts
+        if (isset($fontdata)) {
+            $this->mpdf->fontdata = array_merge($fontdata, $this->mpdf->fontdata);
+            // This loop repeats what is done in the constructor of mPDF, around line 1135
+            foreach ($fontdata AS $f => $fs) {
+                if (isset($fs['R']) && $fs['R']) { $this->mpdf->available_unifonts[] = $f; }
+                if (isset($fs['B']) && $fs['B']) { $this->mpdf->available_unifonts[] = $f.'B'; }
+                if (isset($fs['I']) && $fs['I']) { $this->mpdf->available_unifonts[] = $f.'I'; }
+                if (isset($fs['BI']) && $fs['BI']) { $this->mpdf->available_unifonts[] = $f.'BI'; }
+            }
+            $this->mpdf->default_available_fonts = $this->mpdf->available_unifonts;
+        }
+
     }
 
     /**
