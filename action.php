@@ -270,7 +270,7 @@ class action_plugin_dw2pdf extends DokuWiki_Action_Plugin {
                 DOKU_CHANGE_TYPE_REVERT,
             );
         }
-        $count = 0;
+        $count = 1;
         // Get all revisions, including current
         $revisions = array_merge(
             array($INFO['meta']['last_change']['date']),
