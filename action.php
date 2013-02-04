@@ -206,6 +206,8 @@ class action_plugin_dw2pdf extends DokuWiki_Action_Plugin {
         // prepare replacements
         $replace = array(
                 '@ID@'      => $ID,
+                '@NS@'      => getNS($ID),
+                '@NS_CSS@'  => str_replace(':', '__', getNS($ID)),
                 '@PAGE@'    => '{PAGENO}',
                 '@PAGES@'   => '{nb}',
                 '@TITLE@'   => hsc($title),
