@@ -227,6 +227,9 @@ class action_plugin_dw2pdf extends DokuWiki_Action_Plugin {
                 '@REVNUM@'  => $this->get_revision_count(),
         );
 
+        // Relace DATA values, if the Data plugin is available.
+        $html = $this->handleDataReplacements($html);
+
         // set HTML element
         $output['html'] = str_replace(array_keys($replace), array_values($replace), $html);
 
@@ -318,7 +321,50 @@ class action_plugin_dw2pdf extends DokuWiki_Action_Plugin {
             }
             $this->mpdf->default_available_fonts = $this->mpdf->available_unifonts;
         }
+    }
 
+    /**
+     * Replace all @DATA:column@ patterns with values retrieved from the
+     * data plugin's metadata database.
+     * 
+     * @global string $ID The current page ID.
+     * @param string $html Input HTML, in which to find replacement strings.
+     * @return string HTML string with replacements made.
+     */
+    public function handleDataReplacements($html) {
+        global $ID;
+
+        // Load helper (or give up)
+        $helper = plugin_load('helper', 'data');
+        if ($helper == NULL) return $html;
+
+        // Find replacements (or give up)
+        $count = preg_match_all('/@DATA:(.*?)@/', $html, $matches);
+        if ($count < 1) return $html;
+        $replaceable = array();
+        for ($m=0; $m<count($matches[0]); $m++) {
+            $replaceable[strtolower($matches[1][$m])] = $matches[0][$m];
+        }
+
+        // Set up SQLite, and retrieve this page's metadata
+        $sqlite = $helper->_getDB();
+        $sql = "SELECT key, value
+            FROM pages JOIN data ON data.pid=pages.pid
+            WHERE pages.page = '".$ID."'";
+        $rows = $sqlite->res2arr($sqlite->query($sql));
+
+        // Get replacement values and build the replacement array
+        $replace = array();
+        foreach ($rows as $row) {
+            if (isset($replaceable[$row['key']])) {
+                $replace[$replaceable[$row['key']]] = $row['value'];
+            }
+        }
+
+        // Perform replacements
+        $html = str_replace(array_keys($replace), array_values($replace), $html);
+
+        return $html;
     }
 
     /**
