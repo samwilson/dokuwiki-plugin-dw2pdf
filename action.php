@@ -45,9 +45,7 @@ class action_plugin_dw2pdf extends DokuWiki_Action_Plugin {
      * @return bool
      */
     function convert(&$event, $param) {
-        global $ACT;
-        global $REV;
-        global $ID;
+        global $ACT, $REV, $ID, $conf;
 
         // our event?
         if (( $ACT != 'export_pdfbook' ) && ( $ACT != 'export_pdf' )) return false;
@@ -85,66 +83,44 @@ class action_plugin_dw2pdf extends DokuWiki_Action_Plugin {
         // it's ours, no one else's
         $event->preventDefault();
 
-        // prepare cache
-        $cache = new cache(join(',',$list).$REV.$this->tpl,'.dw2.pdf');
+        // prepare cache (name also used below for XML)
+        $cache_name = join(',',$list).$REV.$this->tpl;
+        $cache = new cache($cache_name, '.dw2pdf.pdf');
         $depends['files']   = array_map('wikiFN',$list);
         $depends['files'][] = __FILE__;
-        $depends['files'][] = dirname(__FILE__).'/renderer.php';
-        $depends['files'][] = dirname(__FILE__).'/mpdf/mpdf.php';
+        //$depends['files'][] = dirname(__FILE__).'/.php';
+        //$depends['files'][] = dirname(__FILE__).'/renderer.php';
+        //$depends['files'][] = dirname(__FILE__).'/mpdf/mpdf.php';
         $depends['files']   = array_merge($depends['files'], getConfigFiles('main'));
 
         // hard work only when no cache available
         if(!$this->getConf('usecache') || !$cache->useCache($depends)){
-            // initialize PDF library
-            require_once(dirname(__FILE__)."/DokuPDF.class.php");
-            $mpdf = new DokuPDF();
-
-            // let mpdf fix local links
-            $self = parse_url(DOKU_URL);
-            $url  = $self['scheme'].'://'.$self['host'];
-            if($self['port']) $url .= ':'.$self['port'];
-            $mpdf->setBasePath($url);
-
-            // Set the title
-            $mpdf->SetTitle($title);
-
-            // some default settings
-            $mpdf->mirrorMargins = 1;
-            $mpdf->useOddEven    = 1;
-            $mpdf->setAutoTopMargin = 'stretch';
-            $mpdf->setAutoBottomMargin = 'stretch';
-
-            // load the template
-            $template = $this->load_template($title);
-
-            // prepare HTML header styles
-            $html  = '<html><head>';
-            $html .= '<style type="text/css">';
-            $html .= $this->load_css();
-            $html .= '@page { size:auto; '.$template['page'].'}';
-            $html .= '@page :first {'.$template['first'].'}';
-            $html .= '</style>';
-            $html .= '</head><body>';
-            $html .= $template['html'];
-            $html .= '<div class="dokuwiki">';
-
             // loop over all pages
+            $xml = '';
             $cnt = count($list);
+            $xml_prolog = '<?xml version="1.0" encoding="UTF-8"?>';
             for($n=0; $n<$cnt; $n++){
                 $page = $list[$n];
-
-                $html .= p_cached_output(wikiFN($page,$REV),'dw2pdf',$page);
-                $html .= $this->page_depend_replacements($template['cite'], cleanID($page));
-                if ($n < ($cnt - 1)){
-                    $html .= '<pagebreak />';
-                }
+                $page_xml = p_cached_output(wikiFN($page,$REV), 'xml', $page);
+                $xml .= substr($page_xml, strlen($xml_prolog));
+            }
+            $xml = $xml_prolog.'<documents>'
+                    .'<wikititle>'.$conf['title'].'</wikititle>'
+                    .$xml.'</documents>';
+            $xml_filename = getCacheName($cache_name, '.dw2pdf.xml');
+            io_saveFile($xml_filename, $xml);
+            
+            $xsl_filename = realpath(DOKU_PLUGIN.'dw2pdf/tpl/'.$this->tpl.'.xsl');
+            $fop_command = realpath(DOKU_PLUGIN.'dw2pdf/fop/fop.bat');
+            
+            $com = $fop_command.' -xml "'.$xml_filename.'" -xsl "'.$xsl_filename.'" "'.$cache->cache.'" 2>&1';
+            io_exec($com, null, $out);
+            if (!file_exists($cache->cache)) {
+                msg("Unable to produce PDF.", -1);
+                msg("Command: <code>$com</code><br />Output:<pre>".$out.'</pre>', -1, '', '', MSG_ADMINS_ONLY);
+                return false;
             }
 
-            $html .= '</div>';
-            $mpdf->WriteHTML($html);
-
-            // write to cache file
-            $mpdf->Output($cache->cache, 'F');
         }
 
         // deliver the file
